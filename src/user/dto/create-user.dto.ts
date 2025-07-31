@@ -1,4 +1,11 @@
-import { IsEmail, IsString, IsStrongPassword } from 'class-validator';
+import { Transform } from 'class-transformer';
+import {
+  IsDateString,
+  IsEmail,
+  IsOptional,
+  IsString,
+  IsStrongPassword,
+} from 'class-validator';
 
 export class CreateUserDto {
   @IsString()
@@ -6,6 +13,11 @@ export class CreateUserDto {
 
   @IsEmail()
   email: string;
+
+  @IsOptional()
+  @IsDateString()
+  @Transform(({ value }) => (value ? new Date(value) : null))
+  birthAt?: string;
 
   @IsStrongPassword({
     minLength: 6,
