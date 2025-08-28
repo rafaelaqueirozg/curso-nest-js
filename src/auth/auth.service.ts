@@ -8,6 +8,7 @@ import { User } from '@prisma/client';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { AuthRegisterDto } from './dto/auth-register.dto';
 import { UserService } from 'src/user/user.service';
+import { comparePassword } from 'src/utils/hash-password.util';
 
 @Injectable()
 export class AuthService {
@@ -57,10 +58,16 @@ export class AuthService {
 
   async login(email: string, password: string): Promise<string> {
     const user = await this.prisma.user.findFirst({
-      where: { email, password },
+      where: { email },
     });
 
     if (!user) {
+      throw new UnauthorizedException('Email e/ou senha inválidos');
+    }
+
+    const isPasswordValid = await comparePassword(password, user.password);
+
+    if (!isPasswordValid) {
       throw new UnauthorizedException('Email e/ou senha inválidos');
     }
 
