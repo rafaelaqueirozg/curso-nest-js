@@ -8,7 +8,11 @@ import { User } from '@prisma/client';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { AuthRegisterDto } from './dto/auth-register.dto';
 import { UserService } from 'src/user/user.service';
-import { comparePassword } from 'src/utils/hash-password.util';
+import {
+  comparePassword,
+  generateHashedPassword,
+} from 'src/utils/hash-password.util';
+import { MailerService } from '@nestjs-modules/mailer';
 
 @Injectable()
 export class AuthService {
@@ -19,6 +23,7 @@ export class AuthService {
     private readonly jwtService: JwtService,
     private readonly prisma: PrismaService,
     private readonly userService: UserService,
+    private readonly mailer: MailerService,
   ) {}
 
   generateToken(user: User): string {
@@ -36,11 +41,11 @@ export class AuthService {
     );
   }
 
-  checkToken(token: string): unknown {
+  checkToken(token: string, issuer?: string): unknown {
     try {
       return this.jwtService.verify(token, {
         audience: this.audience,
-        issuer: this.issuer,
+        issuer: issuer || this.issuer,
       });
     } catch (error) {
       throw new BadRequestException(error);
@@ -83,21 +88,29 @@ export class AuthService {
       throw new UnauthorizedException('Email inválido');
     }
 
+    await this.mailer.sendMail({
+      to: user.email,
+      subject: 'Recuperação de Senha',
+      template: 'forget',
+      context: {
+        name: user.name,
+        token: this.generateToken(user),
+      },
+    });
+
     return true;
   }
 
   async reset(password: string, token: string): Promise<string> {
-    // const payload = this.jwtService.verify(token);
+    const { id } = this.checkToken(token, 'forget') as { id: number };
 
-    // if (!payload || !payload.userId) {
-    //   throw new UnauthorizedException('Token inválido');
-    // }
-
-    const id = 0;
+    if (isNaN(Number(id))) {
+      throw new BadRequestException('Token inválido');
+    }
 
     const user = await this.prisma.user.update({
       where: { id },
-      data: { password },
+      data: { password: await generateHashedPassword(password) },
     });
 
     return this.generateToken(user);
